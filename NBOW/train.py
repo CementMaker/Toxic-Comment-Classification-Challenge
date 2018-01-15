@@ -21,11 +21,12 @@ with tf.Graph().as_default():
     with sess.as_default():
         lstm = nbow(sentence_len=600,
                     embedding_size=150,
-                    vocab_size=35000,
-                    num_label=6)
+                    vocab_size=47000,
+                    num_label=7,
+                    batch_size=800)
 
-        optimizer = tf.train.AdamOptimizer(0.0001)
-        grads_and_vars = optimizer.compute_gradients(lstm.loss)
+        optimizer = tf.train.AdamOptimizer(0.001)
+        grads_and_vars = optimizer.compute_gradients(lstm.loss_train)
         global_step = tf.Variable(0, name="global_step", trainable=False)
         tr_op_set = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
 
@@ -35,31 +36,23 @@ with tf.Graph().as_default():
             feed_dict = {
                 lstm.input: batch,
                 lstm.label: label,
-                lstm.dropout_keep_prob: 0.8
             }
-            _, step, loss = sess.run(
-                [tr_op_set, global_step, lstm.loss],
-                feed_dict=feed_dict)
-
+            _, step, loss = sess.run([tr_op_set, global_step, lstm.loss_train], feed_dict=feed_dict)
             time_str = datetime.datetime.now().isoformat()
             print("{}: step {}, loss {}".format(time_str, step, loss))
             global_loss.append(loss)
+
 
         def dev_step(batch, label):
             feed_dict = {
                 lstm.input: batch,
                 lstm.label: label,
-                lstm.dropout_keep_prob: 0.0
             }
-            step, loss = sess.run([global_step, lstm.loss], feed_dict=feed_dict)
+            step, loss = sess.run([global_step, lstm.loss_test], feed_dict=feed_dict)
             time_str = datetime.datetime.now().isoformat()
             print("{}: step {}, loss {:g}".format(time_str, step, loss))
 
-
-        # x_train, y_train, x_dev, y_dev = split_data()
-        # batches = batch_iter(list(zip(x_train, y_train)), batch_size=200, num_epochs=50)
-
-        batches = data("../data/train.csv").encode_word().get_batch(5, 400)
+        batches = data("../data/train.csv").encode_word().get_batch(10, 800)
         x_dev, y_dev = pickle.load(open("./pkl/test.pkl", "rb"))
         for data in batches:
             x_train, y_train = zip(*data)
@@ -75,11 +68,5 @@ with tf.Graph().as_default():
         plt.xlabel("batches")
         plt.ylabel("loss")
         plt.savefig("loss_modify.png")
-        plt.close()
-
-        plt.plot(x, global_accuracy, 'b', label="accuracy")
-        plt.xlabel("batches")
-        plt.ylabel("accuracy")
-        plt.savefig("accuracy.png")
         plt.close()
 
